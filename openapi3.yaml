@@ -1,58 +1,168 @@
 openapi: 3.0.1
 info:
-  title: service-name
-  description: basic template for map colonies service
+  title: actiony
+  description: api for managing actions throught their lifecycle
   version: 1.0.0
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
-
+tags:
+  - name: action
+    description: an action in the ecosystem
 paths:
-  /anotherResource:
+  /action:
     get:
-      operationId: getAnotherResource
+      operationId: getActions
       tags:
-        - anotherResource
-      summary: gets the resource
+        - action
+      summary: return all actions matching criteria
+      parameters:
+        - in: query
+          name: service
+          description: >-
+            returned actions matching the following service
+          schema:
+            $ref: '#/components/schemas/service'
+        - in: query
+          name: status
+          description: >-
+            returned actions matching the following statuses
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/actionStatus'
+        - in: query
+          name: rotation
+          description: >-
+            returned actions matching the following service rotation
+          schema:
+            $ref: '#/components/schemas/rotation'
+        - in: query
+          name: sort
+          description: returned actions order sorted by creation date
+          schema:
+            $ref: '#/components/schemas/order'
+        - in: query
+          name: limit
+          description: returned actions limitation
+          schema:
+            $ref: '#/components/schemas/limit'
       responses:
         200:
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/anotherResource'
-  /resourceName:
-    get:
-      operationId: getResourceName
-      tags:
-        - resourceName
-      summary: gets the resource
-      responses:
-        200:
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/resource'
+                type: array
+                items:
+                  $ref: '#/components/schemas/action'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        5XX:
+          $ref: '#/components/responses/UnexpectedError'
     post:
-      operationId: createResource
+      operationId: postAction
       tags:
-        - resourceName
-      summary: creates a new record of type resource
+        - action
+      summary: create a new action
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                service:
+                  $ref: '#/components/schemas/service'
+                state:
+                  $ref: '#/components/schemas/actionState'
+                metadata:
+                  $ref: '#/components/schemas/actionMetadata'
+              required:
+                - service
+                - state
+              additionalProperties: false
       responses:
-        201:
-          description: created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/resource'
-        400:
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/error'
+        '201':
+          $ref: '#/components/responses/CreatedActionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        5XX:
+          $ref: '#/components/responses/UnexpectedError'
+  /action/{actionId}:
+    patch:
+      operationId: patchActionById
+      tags:
+        - action
+      summary: update action by id
+      parameters:
+        - in: path
+          name: actionId
+          schema:
+            $ref: '#/components/schemas/actionId'
+          required: true
+          description: id of the action to patch
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                status:
+                  $ref: '#/components/schemas/actionStatus'
+                metadata:
+                  $ref: '#/components/schemas/actionMetadata'
+              additionalProperties: false
+      responses:
+        '200':
+          description: action updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        5XX:
+          $ref: '#/components/responses/UnexpectedError'
 components:
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+    UnexpectedError:
+      description: Unexpected Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+    CreatedActionResponse:
+      description: the created action id
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              actionId:
+                $ref: '#/components/schemas/actionId'
+            required:
+              - actionId
   schemas:
     error:
       type: object
@@ -61,27 +171,65 @@ components:
       properties:
         message:
           type: string
-    resource:
+    actionId:
+      type: string
+      format: uuid
+    service:
+      type: string
+    rotation:
+      type: string
+      minLength: 1
+      example: '1.3'
+    actionState:
+      type: integer
+      minimum: 0
+    actionStatus:
+      type: string
+      enum:
+        - active
+        - completed
+        - failed
+        - canceled
+    actionMetadata:
       type: object
+      additionalProperties: true
+    date:
+      type: string
+      format: date-time
+    order:
+      type: string
+      enum:
+        - asc
+        - desc
+      default: desc
+    limit:
+      type: integer
+      minimum: 1
+    action:
+      type: object
+      properties:
+        actionId:
+          $ref: '#/components/schemas/actionId'
+        service:
+          $ref: '#/components/schemas/service'
+        rotation:
+          $ref: '#/components/schemas/rotation'
+        state:
+          $ref: '#/components/schemas/actionState'
+        status:
+          $ref: '#/components/schemas/actionStatus'
+        metadata:
+          $ref: '#/components/schemas/actionMetadata'
+        createdAt:
+          $ref: '#/components/schemas/date'
+        updatedAt:
+          $ref: '#/components/schemas/date'
+        closedAt:
+          $ref: '#/components/schemas/date'
       required:
         - id
-        - name
-        - description
-      properties:
-        id:
-          type: number
-          format: int64
-        name:
-          type: string
-        description:
-          type: string
-    anotherResource:
-      type: object
-      required:
-        - kind
-        - isAlive
-      properties:
-        kind:
-          type: string
-        isAlive:
-          type: boolean
+        - service
+        - rotation
+        - state
+        - status
+        - createdAt

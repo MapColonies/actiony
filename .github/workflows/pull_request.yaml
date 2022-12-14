@@ -47,9 +47,30 @@ jobs:
   tests:
     name: Run Tests
     runs-on: ubuntu-latest
+    container: node:16
+
     strategy:
       matrix:
         node: [14.x, 16.x]
+
+    services:
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres:12
+        # Provide the password for postgres
+        env:
+          POSTGRES_PASSWORD: 1234
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Check out Git repository
@@ -62,6 +83,27 @@ jobs:
 
       - name: Install Node.js dependencies
         run: npm ci
+
+      - name: Install pg client
+        run: |
+          apt-get update && apt-get install -y lsb-release
+          sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
+          apt-get update
+          apt-get install -y postgresql-client
+
+      - name: Create schema
+        run: psql -h postgres -d postgres -U postgres -c 'CREATE SCHEMA actiony;'
+        env:
+          PGPASSWORD: 1234
+
+      - name: Run migrations
+        run: npm run typeorm -- migration:run
+        env:
+          DB_HOST: postgres
+          DB_PORT: 5432
+          DB_USERNAME: postgres
+          DB_PASSWORD: 1234
 
       - name: Run tests
         run: npm run test
@@ -81,3 +123,6 @@ jobs:
 
       - name: build Docker image
         run: docker build -t test-build:latest .
+
+      - name: build migrations Docker image
+        run: docker build -f ./migrations.Dockerfile -t test-migrations-build:latest .
